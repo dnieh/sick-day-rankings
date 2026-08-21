@@ -51,9 +51,11 @@
   .tideline {
     margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--hairline);
     font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
-    display: flex; gap: 1.2rem; flex-wrap: wrap;
+    display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: space-between;
   }
   .tideline .t-lbl { color: var(--muted); }
+  .tideline .t-note { color: var(--muted); font-size: 0.6rem; letter-spacing: 0.18em; }
+  #tidechart { display: block; width: 100%; height: auto; margin-top: 0.3rem; }
 
   .tip { cursor: help; border-bottom: 1px dotted var(--muted); position: relative; }
   .tip:hover::after, .tip:focus::after {
@@ -119,6 +121,7 @@
   </div>
 
   <div class="tideline" id="tideline"></div>
+  <svg id="tidechart" viewBox="0 0 720 104" role="img" aria-label="Tide chart for the selected day"></svg>
   <div class="cols"><span>Rank · Spot</span><span>Swell · Wind ·
     <span class="tip" id="tip-skill" tabindex="0">Skill</span> ·
     <span class="tip" id="tip-quality" tabindex="0">Quality</span></span></div>
@@ -201,6 +204,95 @@ function fmtHour(t) {
   return (h % 12 || 12) + (h < 12 ? "am" : "pm");
 }
 
+// Fractional hour-of-day right now in a region's timezone
+function nowHourIn(tz) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false, hour: "numeric", minute: "numeric",
+  }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return (parseInt(p.hour, 10) % 24) + parseInt(p.minute, 10) / 60;
+}
+function todayIn(tz) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+}
+
+// Catmull-Rom through points -> smooth cubic bezier path
+function smoothPath(pts) {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i],
+          p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+function renderTide(day, region) {
+  const svg = document.getElementById("tidechart");
+  const strip = document.getElementById("tideline");
+  const curve = day.tide_curve || [];
+  if (curve.length < 2) {
+    svg.style.display = "none";
+    if (day.tides && day.tides.length) {
+      strip.style.display = "flex";
+      strip.innerHTML = '<span class="t-lbl">Tide</span>' + day.tides.map((t) =>
+        `<span>${t.type} ${fmtHour(t.time)} · ${t.height_ft}ft</span>`).join("");
+    } else strip.style.display = "none";
+    return;
+  }
+  strip.style.display = "flex";
+  strip.innerHTML = '<span class="t-lbl">Tide</span><span class="t-note">solid = so far · dashed = rest of day</span>';
+  svg.style.display = "block";
+
+  const W = 720, H = 104, padX = 10, padTop = 22, padBot = 18;
+  const hs = curve.map((p) => p.h);
+  const lo = Math.min(...hs), hi = Math.max(...hs), span = (hi - lo) || 1;
+  const X = (hour) => padX + (hour / 23) * (W - 2 * padX);
+  const Y = (h) => padTop + (1 - (h - lo) / span) * (H - padTop - padBot);
+  const pts = curve.map((p, i) => ({ x: X(i), y: Y(p.h) }));
+
+  // Split solid (elapsed) vs dashed (projection): today splits at now,
+  // future days are entirely projection.
+  const isToday = day.date === todayIn(region.timezone);
+  let split = isToday ? Math.min(23, Math.max(0, nowHourIn(region.timezone))) : 0;
+  const si = Math.floor(split);
+  const frac = split - si;
+  const nowPt = isToday && si < 23
+    ? { x: X(split), y: Y(curve[si].h + (curve[si + 1].h - curve[si].h) * frac) }
+    : null;
+
+  const ink = "#121210", muted = "#6d6b62", fire = "#d43d17", hair = "#c9c7bb";
+  let parts = [];
+  parts.push(`<line x1="${padX}" y1="${H - padBot}" x2="${W - padX}" y2="${H - padBot}" stroke="${hair}" stroke-width="1"></line>`);
+  if (nowPt) {
+    const solid = pts.slice(0, si + 1).concat([nowPt]);
+    const dashed = [nowPt].concat(pts.slice(si + 1));
+    parts.push(`<path d="${smoothPath(solid)}" fill="none" stroke="${ink}" stroke-width="2"></path>`);
+    parts.push(`<path d="${smoothPath(dashed)}" fill="none" stroke="${ink}" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"></path>`);
+    parts.push(`<line x1="${nowPt.x.toFixed(1)}" y1="${padTop - 6}" x2="${nowPt.x.toFixed(1)}" y2="${H - padBot}" stroke="${hair}" stroke-width="1"></line>`);
+    parts.push(`<circle cx="${nowPt.x.toFixed(1)}" cy="${nowPt.y.toFixed(1)}" r="3.5" fill="${fire}"></circle>`);
+  } else {
+    parts.push(`<path d="${smoothPath(pts)}" fill="none" stroke="${ink}" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"></path>`);
+  }
+  // Direct labels on the extremes
+  for (const t of day.tides || []) {
+    const h24 = parseInt(t.time, 10);
+    const x = X(h24), y = Y(t.height_ft);
+    const up = t.type === "high";
+    let lx = Math.min(W - padX - 4, Math.max(padX + 4, x));
+    let anchor = "middle";
+    if (lx < 60) anchor = "start";
+    if (lx > W - 60) anchor = "end";
+    parts.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${ink}"></circle>`);
+    parts.push(`<text x="${lx.toFixed(1)}" y="${(up ? y - 9 : y + 15).toFixed(1)}" text-anchor="${anchor}" ` +
+      `font-family="Space Mono, monospace" font-size="10" letter-spacing="1" fill="${muted}">` +
+      `${up ? "H" : "L"} ${fmtHour(t.time).toUpperCase()} · ${t.height_ft}FT</text>`);
+  }
+  svg.innerHTML = parts.join("");
+}
+
 function render() {
   const regions = DATA.regions;
   if (!state.region) state.region = Object.keys(regions)[0];
@@ -229,14 +321,7 @@ function render() {
   document.getElementById("parts").replaceChildren(
     ...parts.map((p) => chip(PART_LABELS[p] || p, p === state.part, () => { state.part = p; render(); })));
 
-  const tideEl = document.getElementById("tideline");
-  if (day.tides && day.tides.length) {
-    tideEl.style.display = "flex";
-    tideEl.innerHTML = '<span class="t-lbl">Tide</span>' + day.tides.map((t) =>
-      `<span>${t.type} ${fmtHour(t.time)} · ${t.height_ft}ft</span>`).join("");
-  } else {
-    tideEl.style.display = "none";
-  }
+  renderTide(day, region);
 
   document.getElementById("tip-skill").setAttribute("data-tip",
     "Skill rating of the break\n● All levels\n■ Intermediate\n◆ Advanced\n◆◆ Experts only");
