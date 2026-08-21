@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sick Day — surf rankings</title>
+<meta name="description" content="Ranked surf spots for NorCal and Oahu, updated through the day. Pick a region, pick a time window, see where it's best.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --line: light-dark(#ddd, #3a3a3a);
+    --muted: light-dark(#667, #99a);
+    --card: light-dark(#f6f6f7, #232326);
+    --accent: light-dark(#0b62c4, #6fb3ff);
+    --hot: light-dark(#0a7d33, #4cc26e);
+    --bg: light-dark(#ffffff, #161618);
+    --ink: light-dark(#1a1a1c, #e8e8ea);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45;
+  }
+  .wrap { max-width: 34rem; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+  h1 { font-size: 1.35rem; margin: 0; }
+  .tag { color: var(--muted); margin: 0.1rem 0 1rem; font-size: 0.9rem; }
+  .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+  .chips.scroll { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.2rem; }
+  .chip {
+    padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.86rem;
+    border: 1px solid var(--line); background: none; color: var(--ink);
+    cursor: pointer; white-space: nowrap;
+  }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-radius: 10px;
+    margin-bottom: 0.5rem; background: var(--card);
+  }
+  .rank { color: var(--muted); font-variant-numeric: tabular-nums; width: 1.4rem; text-align: right; }
+  .grow { flex: 1; min-width: 0; }
+  .name { font-weight: 600; font-size: 0.98rem; }
+  .cond { color: var(--muted); font-size: 0.82rem; }
+  .score {
+    font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1.05rem;
+    padding: 0.15rem 0.55rem; border-radius: 8px; color: #fff; background: var(--muted);
+  }
+  .score.hot { background: var(--hot); }
+  .empty { color: var(--muted); padding: 2rem 0; text-align: center; }
+  footer { margin-top: 1.5rem; color: var(--muted); font-size: 0.78rem; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🤙 Sick Day</h1>
+  <p class="tag">Where it's best, ranked. Updated through the day.</p>
+
+  <div class="chips" id="regions"></div>
+  <div class="chips scroll" id="days"></div>
+  <div class="chips scroll" id="parts"></div>
+  <div id="list"></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const PART_LABELS = {
+  overall: "Best of day", dawn: "Dawn 5–9", late_am: "Late AM 9–12",
+  early_pm: "Early PM 12–3", late_pm: "Late PM 3–8",
+};
+let DATA = null;
+let state = { region: null, day: 0, part: "overall" };
+
+function chip(label, on, cb) {
+  const b = document.createElement("button");
+  b.className = "chip" + (on ? " on" : "");
+  b.textContent = label;
+  b.onclick = cb;
+  return b;
+}
+
+function dayLabel(iso, i) {
+  if (i === 0) return "Today";
+  if (i === 1) return "Tomorrow";
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
+}
+
+function render() {
+  const regions = DATA.regions;
+  if (!state.region) state.region = Object.keys(regions)[0];
+  const region = regions[state.region];
+
+  const rEl = document.getElementById("regions");
+  rEl.replaceChildren(...Object.entries(regions).map(([k, v]) =>
+    chip(v.name, k === state.region, () => { state.region = k; state.day = 0; render(); })));
+
+  const days = region.days;
+  if (state.day >= days.length) state.day = 0;
+  const dEl = document.getElementById("days");
+  dEl.replaceChildren(...days.map((d, i) =>
+    chip(dayLabel(d.date, i), i === state.day, () => { state.day = i; render(); })));
+
+  const pEl = document.getElementById("parts");
+  const parts = ["overall", ...Object.keys(DATA.dayparts)];
+  pEl.replaceChildren(...parts.map((p) =>
+    chip(PART_LABELS[p] || p, p === state.part, () => { state.part = p; render(); })));
+
+  const day = days[state.day];
+  const entries = state.part === "overall" ? day.overall : day.by_daypart[state.part];
+  const list = document.getElementById("list");
+  if (!entries || !entries.length) {
+    list.innerHTML = '<div class="empty">No scoreable surf in this window.</div>';
+  } else {
+    list.replaceChildren(...entries.map((e, i) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const hot = e.score >= DATA.threshold;
+      row.innerHTML = `
+        <span class="rank">${i + 1}</span>
+        <span class="grow">
+          <div class="name"></div>
+          <div class="cond"></div>
+        </span>
+        <span class="score${hot ? " hot" : ""}">${e.score}</span>`;
+      row.querySelector(".name").textContent = e.name;
+      row.querySelector(".cond").textContent =
+        `${e.height_ft}ft @ ${e.period_s}s ${e.direction} · wind ${e.wind} · best ${fmtHour(e.best_time)}`;
+      return row;
+    }));
+  }
+
+  const age = Math.round((Date.now() - new Date(DATA.generated_at)) / 60000);
+  document.getElementById("foot").innerHTML =
+    `Updated ${age < 60 ? age + " min" : Math.round(age / 60) + "h"} ago · ` +
+    `scores 0–100, <b>${DATA.threshold}+</b> is drop-your-plans territory · ` +
+    `swell &amp; wind from <a href="https://open-meteo.com">Open-Meteo</a>, tides from NOAA · ` +
+    `forecasts further out are less certain`;
+}
+
+function fmtHour(t) {
+  const h = parseInt(t, 10);
+  return (h % 12 || 12) + (h < 12 ? "am" : "pm");
+}
+
+fetch("rankings.json?t=" + Math.floor(Date.now() / 300000))
+  .then((r) => r.json())
+  .then((d) => { DATA = d; render(); })
+  .catch(() => {
+    document.getElementById("list").innerHTML =
+      '<div class="empty">Couldn\'t load rankings — try again shortly.</div>';
+  });
+</script>
+</body>
+</html>
