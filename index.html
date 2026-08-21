@@ -84,8 +84,10 @@
   .cell { display: flex; flex-direction: column; gap: 2px; }
   .cell .lbl { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
   .cell .val { font-size: 0.95rem; white-space: nowrap; }
-  .q { width: 3.4rem; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
-  .score { font-size: 0.72rem; color: var(--muted); width: 1.7rem; text-align: right; }
+  .skill { width: 2.4rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 2px; }
+  .q { width: 3.6rem; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .score { font-size: 1.15rem; font-weight: 700; line-height: 1; }
+  .tier { font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; }
 
   footer { margin-top: 1.6rem; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--muted); line-height: 1.8; }
   footer a { color: var(--ink); }
@@ -115,8 +117,9 @@
   </div>
 
   <div class="tideline" id="tideline"></div>
+  <div class="legend" id="legend-skill"></div>
   <div class="legend" id="legend"></div>
-  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind · Quality</span></div>
+  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind · Skill · Quality</span></div>
   <div id="list"><div class="empty">Loading…</div></div>
 
   <footer>
@@ -130,13 +133,21 @@ const PART_LABELS = {
   overall: "Best of day", dawn: "Dawn 5–9", late_am: "Late AM 9–12",
   early_pm: "Early PM 12–3", late_pm: "Late PM 3–8",
 };
+// Quality: tier word + color, from score vs published threshold
 const TIERS = [
-  { min: 90, name: "Firing", glyph: "ddiamond", color: "var(--fire)" },
-  { min: null, name: "Go", glyph: "diamond", color: "var(--ink)" },       // min = threshold
-  { min: 60, name: "Fun", glyph: "square", color: "var(--blue)" },
-  { min: 40, name: "Mellow", glyph: "circle", color: "var(--green)" },
-  { min: 0, name: "Skip", glyph: "hollow", color: "var(--muted)" },
+  { name: "Firing", color: "var(--fire)" },   // 90+
+  { name: "Go", color: "var(--ink)" },        // threshold+
+  { name: "Fun", color: "var(--blue)" },      // 60+
+  { name: "Marginal", color: "var(--green)" },// 40+
+  { name: "Skip", color: "var(--muted)" },
 ];
+// Skill: ski-style rating of the BREAK itself
+const SKILL = {
+  green: { glyph: "circle", color: "var(--green)", label: "All levels" },
+  blue: { glyph: "square", color: "var(--blue)", label: "Intermediate" },
+  black: { glyph: "diamond", color: "var(--ink)", label: "Advanced" },
+  double_black: { glyph: "ddiamond", color: "var(--ink)", label: "Experts" },
+};
 let DATA = null;
 let state = { region: null, day: 0, part: "overall" };
 
@@ -150,9 +161,8 @@ function svgGlyph(kind, color) {
 }
 
 function tierFor(score) {
-  const t = DATA.threshold;
   if (score >= 90) return TIERS[0];
-  if (score >= t) return TIERS[1];
+  if (score >= DATA.threshold) return TIERS[1];
   if (score >= 60) return TIERS[2];
   if (score >= 40) return TIERS[3];
   return TIERS[4];
@@ -160,9 +170,14 @@ function tierFor(score) {
 
 function qualityHTML(score) {
   const tier = tierFor(score);
-  const g = svgGlyph(tier.glyph, tier.color);
-  const extra = tier.glyph === "ddiamond" ? g : "";
-  return `<span class="score">${score}</span>${g}${extra}`;
+  return `<span class="score" style="color:${tier.color}">${score}</span>` +
+         `<span class="tier" style="color:${tier.color}">${tier.name}</span>`;
+}
+
+function skillHTML(difficulty) {
+  const s = SKILL[difficulty] || SKILL.blue;
+  const g = svgGlyph(s.glyph, s.color);
+  return s.glyph === "ddiamond" ? g + g : g;
 }
 
 function chip(label, on, cb) {
@@ -222,13 +237,20 @@ function render() {
     tideEl.style.display = "none";
   }
 
-  document.getElementById("legend").innerHTML = [
-    [svgGlyph("ddiamond", "var(--fire)") + svgGlyph("ddiamond", "var(--fire)"), "Firing 90+"],
-    [svgGlyph("diamond", "var(--ink)"), `Go ${DATA.threshold}+`],
-    [svgGlyph("square", "var(--blue)"), "Fun 60+"],
-    [svgGlyph("circle", "var(--green)"), "Mellow 40+"],
-    [svgGlyph("hollow", "var(--muted)"), "Skip"],
-  ].map(([g, l]) => `<span class="li">${g}${l}</span>`).join("");
+  document.getElementById("legend-skill").innerHTML =
+    '<span class="li">Skill</span>' +
+    Object.values(SKILL).map((s) => {
+      const g = svgGlyph(s.glyph, s.color);
+      return `<span class="li">${s.glyph === "ddiamond" ? g + g : g}${s.label}</span>`;
+    }).join("");
+  document.getElementById("legend").innerHTML =
+    '<span class="li">Quality</span>' + [
+      [`Firing 90+`, "var(--fire)"],
+      [`Go ${DATA.threshold}+`, "var(--ink)"],
+      ["Fun 60+", "var(--blue)"],
+      ["Marginal 40+", "var(--green)"],
+      ["Skip", "var(--muted)"],
+    ].map(([l, c]) => `<span class="li" style="color:${c}">${l}</span>`).join("");
 
   const list = document.getElementById("list");
   if (!entries || !entries.length) {
@@ -248,6 +270,7 @@ function render() {
         <span class="cell"><span class="lbl">Swell</span><span class="val">${e.height_ft}ft @ ${e.period_s}s ${e.direction}</span></span>
         <span class="cell"><span class="lbl">Wind</span><span class="val">${e.wind}</span></span>
       </span>
+      <span class="skill" title="${(SKILL[e.difficulty] || SKILL.blue).label}">${skillHTML(e.difficulty)}</span>
       <span class="q">${qualityHTML(e.score)}</span>`;
     row.querySelector(".name").textContent = e.name;
     row.querySelector(".sub").textContent =
