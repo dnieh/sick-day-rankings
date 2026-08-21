@@ -5,63 +5,117 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sick Day — surf rankings</title>
 <meta name="description" content="Ranked surf spots for NorCal and Oahu, updated through the day. Pick a region, pick a time window, see where it's best.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap">
 <style>
   :root {
-    color-scheme: light dark;
-    --line: light-dark(#ddd, #3a3a3a);
-    --muted: light-dark(#667, #99a);
-    --card: light-dark(#f6f6f7, #232326);
-    --accent: light-dark(#0b62c4, #6fb3ff);
-    --hot: light-dark(#0a7d33, #4cc26e);
-    --bg: light-dark(#ffffff, #161618);
-    --ink: light-dark(#1a1a1c, #e8e8ea);
+    --paper: #f1f0ea;
+    --ink: #121210;
+    --muted: #6d6b62;
+    --line: #d8d6cb;
+    --hairline: #c9c7bb;
+    --fire: #d43d17;
+    --blue: #1d5bbf;
+    --green: #17803d;
   }
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45;
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .wrap { max-width: 34rem; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
-  h1 { font-size: 1.35rem; margin: 0; }
-  .tag { color: var(--muted); margin: 0.1rem 0 1rem; font-size: 0.9rem; }
-  .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
-  .chips.scroll { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.2rem; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 1.4rem 1.2rem 4rem; }
+  .eyebrow {
+    font-size: 0.72rem; letter-spacing: 0.28em; text-transform: uppercase;
+    margin-bottom: 0.9rem;
+  }
+  .masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+  h1 {
+    font-family: "Archivo Black", "Arial Black", sans-serif;
+    font-size: clamp(3.2rem, 13vw, 8rem); line-height: 0.88;
+    margin: 0; letter-spacing: -0.01em; text-transform: uppercase;
+  }
+  .stat { text-align: right; font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink); }
+  .stat b { display: block; font-size: 1.5rem; letter-spacing: 0.05em; font-weight: 700; }
+  .stat span { color: var(--muted); }
+
+  .controls { margin: 1.6rem 0 0.4rem; display: flex; flex-direction: column; gap: 0.55rem; }
+  .chips { display: flex; gap: 1.1rem; flex-wrap: wrap; }
   .chip {
-    padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.86rem;
-    border: 1px solid var(--line); background: none; color: var(--ink);
-    cursor: pointer; white-space: nowrap;
+    background: none; border: none; padding: 0 0 3px; cursor: pointer;
+    font-family: inherit; font-size: 0.76rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--muted); border-bottom: 2px solid transparent;
   }
-  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip.on { color: var(--ink); border-bottom-color: var(--fire); }
+
+  .legend {
+    display: flex; gap: 1.1rem; flex-wrap: wrap; align-items: center;
+    margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--hairline);
+    font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+  }
+  .legend .li { display: inline-flex; align-items: center; gap: 0.35rem; }
+
+  .cols {
+    display: flex; justify-content: space-between; font-size: 0.68rem;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted);
+    padding: 1.1rem 0 0.5rem; border-bottom: 1px solid var(--ink); margin-top: 0.4rem;
+  }
   .row {
-    display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-radius: 10px;
-    margin-bottom: 0.5rem; background: var(--card);
+    display: flex; align-items: center; gap: 1.2rem;
+    padding: 1rem 0; border-bottom: 1px solid var(--hairline);
   }
-  .rank { color: var(--muted); font-variant-numeric: tabular-nums; width: 1.4rem; text-align: right; }
-  .grow { flex: 1; min-width: 0; }
-  .name { font-weight: 600; font-size: 0.98rem; }
-  .cond { color: var(--muted); font-size: 0.82rem; }
-  .score {
-    font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1.05rem;
-    padding: 0.15rem 0.55rem; border-radius: 8px; color: #fff; background: var(--muted);
+  .rank { font-size: 0.8rem; color: var(--muted); width: 1.6rem; flex-shrink: 0; }
+  .who { flex: 1; min-width: 0; }
+  .name {
+    font-family: "Archivo Black", "Arial Black", sans-serif;
+    font-size: clamp(1.5rem, 4.5vw, 2.3rem); line-height: 1; text-transform: uppercase;
+    letter-spacing: 0.005em;
   }
-  .score.hot { background: var(--hot); }
-  .empty { color: var(--muted); padding: 2rem 0; text-align: center; }
-  footer { margin-top: 1.5rem; color: var(--muted); font-size: 0.78rem; }
-  footer a { color: var(--accent); }
+  .sub {
+    font-size: 0.66rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted); margin-top: 0.35rem;
+  }
+  .data { display: flex; gap: 1.6rem; flex-shrink: 0; text-align: right; }
+  .cell { display: flex; flex-direction: column; gap: 2px; }
+  .cell .lbl { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+  .cell .val { font-size: 0.95rem; white-space: nowrap; }
+  .q { width: 3.4rem; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+  .score { font-size: 0.72rem; color: var(--muted); width: 1.7rem; text-align: right; }
+
+  footer { margin-top: 1.6rem; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--muted); line-height: 1.8; }
+  footer a { color: var(--ink); }
+  .empty { padding: 3rem 0; text-align: center; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.15em; text-transform: uppercase; }
+
+  @media (max-width: 700px) {
+    .row { flex-wrap: wrap; gap: 0.5rem 1rem; }
+    .who { flex-basis: calc(100% - 6.5rem); }
+    .data { width: 100%; justify-content: flex-start; text-align: left; padding-left: 2.8rem; gap: 1.4rem; }
+    .masthead { flex-direction: column; align-items: flex-start; }
+    .stat { text-align: left; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🤙 Sick Day</h1>
-  <p class="tag">Where it's best, ranked. Updated through the day.</p>
+  <div class="eyebrow" id="eyebrow">LOADING…</div>
+  <div class="masthead">
+    <h1>Sick<br>Day</h1>
+    <div class="stat" id="stat"></div>
+  </div>
 
-  <div class="chips" id="regions"></div>
-  <div class="chips scroll" id="days"></div>
-  <div class="chips scroll" id="parts"></div>
-  <div id="list"></div>
+  <div class="controls">
+    <div class="chips" id="regions"></div>
+    <div class="chips" id="days"></div>
+    <div class="chips" id="parts"></div>
+  </div>
 
-  <footer id="foot"></footer>
+  <div class="legend" id="legend"></div>
+  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind · Tide · Quality</span></div>
+  <div id="list"><div class="empty">Loading…</div></div>
+
+  <footer>
+    Scores 0–100. Swell &amp; wind from <a href="https://open-meteo.com">Open-Meteo</a>, tides from NOAA.
+    Forecasts further out are less certain. Surf at your own risk.
+  </footer>
 </div>
 
 <script>
@@ -69,8 +123,40 @@ const PART_LABELS = {
   overall: "Best of day", dawn: "Dawn 5–9", late_am: "Late AM 9–12",
   early_pm: "Early PM 12–3", late_pm: "Late PM 3–8",
 };
+const TIERS = [
+  { min: 90, name: "Firing", glyph: "ddiamond", color: "var(--fire)" },
+  { min: null, name: "Go", glyph: "diamond", color: "var(--ink)" },       // min = threshold
+  { min: 60, name: "Fun", glyph: "square", color: "var(--blue)" },
+  { min: 40, name: "Mellow", glyph: "circle", color: "var(--green)" },
+  { min: 0, name: "Skip", glyph: "hollow", color: "var(--muted)" },
+];
 let DATA = null;
 let state = { region: null, day: 0, part: "overall" };
+
+function svgGlyph(kind, color) {
+  const s = (inner) =>
+    `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${inner}</svg>`;
+  if (kind === "circle") return s(`<circle cx="7" cy="7" r="5.5" fill="${color}"></circle>`);
+  if (kind === "hollow") return s(`<circle cx="7" cy="7" r="5" fill="none" stroke="${color}" stroke-width="1.5"></circle>`);
+  if (kind === "square") return s(`<rect x="2" y="2" width="10" height="10" fill="${color}"></rect>`);
+  return s(`<path d="M7 0.5 L13.5 7 L7 13.5 L0.5 7 Z" fill="${color}"></path>`);
+}
+
+function tierFor(score) {
+  const t = DATA.threshold;
+  if (score >= 90) return TIERS[0];
+  if (score >= t) return TIERS[1];
+  if (score >= 60) return TIERS[2];
+  if (score >= 40) return TIERS[3];
+  return TIERS[4];
+}
+
+function qualityHTML(score) {
+  const tier = tierFor(score);
+  const g = svgGlyph(tier.glyph, tier.color);
+  const extra = tier.glyph === "ddiamond" ? g : "";
+  return `<span class="score">${score}</span>${g}${extra}`;
+}
 
 function chip(label, on, cb) {
   const b = document.createElement("button");
@@ -82,61 +168,9 @@ function chip(label, on, cb) {
 
 function dayLabel(iso, i) {
   if (i === 0) return "Today";
-  if (i === 1) return "Tomorrow";
+  if (i === 1) return "Tmrw";
   const d = new Date(iso + "T12:00:00");
   return d.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
-}
-
-function render() {
-  const regions = DATA.regions;
-  if (!state.region) state.region = Object.keys(regions)[0];
-  const region = regions[state.region];
-
-  const rEl = document.getElementById("regions");
-  rEl.replaceChildren(...Object.entries(regions).map(([k, v]) =>
-    chip(v.name, k === state.region, () => { state.region = k; state.day = 0; render(); })));
-
-  const days = region.days;
-  if (state.day >= days.length) state.day = 0;
-  const dEl = document.getElementById("days");
-  dEl.replaceChildren(...days.map((d, i) =>
-    chip(dayLabel(d.date, i), i === state.day, () => { state.day = i; render(); })));
-
-  const pEl = document.getElementById("parts");
-  const parts = ["overall", ...Object.keys(DATA.dayparts)];
-  pEl.replaceChildren(...parts.map((p) =>
-    chip(PART_LABELS[p] || p, p === state.part, () => { state.part = p; render(); })));
-
-  const day = days[state.day];
-  const entries = state.part === "overall" ? day.overall : day.by_daypart[state.part];
-  const list = document.getElementById("list");
-  if (!entries || !entries.length) {
-    list.innerHTML = '<div class="empty">No scoreable surf in this window.</div>';
-  } else {
-    list.replaceChildren(...entries.map((e, i) => {
-      const row = document.createElement("div");
-      row.className = "row";
-      const hot = e.score >= DATA.threshold;
-      row.innerHTML = `
-        <span class="rank">${i + 1}</span>
-        <span class="grow">
-          <div class="name"></div>
-          <div class="cond"></div>
-        </span>
-        <span class="score${hot ? " hot" : ""}">${e.score}</span>`;
-      row.querySelector(".name").textContent = e.name;
-      row.querySelector(".cond").textContent =
-        `${e.height_ft}ft @ ${e.period_s}s ${e.direction} · wind ${e.wind} · best ${fmtHour(e.best_time)}`;
-      return row;
-    }));
-  }
-
-  const age = Math.round((Date.now() - new Date(DATA.generated_at)) / 60000);
-  document.getElementById("foot").innerHTML =
-    `Updated ${age < 60 ? age + " min" : Math.round(age / 60) + "h"} ago · ` +
-    `scores 0–100, <b>${DATA.threshold}+</b> is drop-your-plans territory · ` +
-    `swell &amp; wind from <a href="https://open-meteo.com">Open-Meteo</a>, tides from NOAA · ` +
-    `forecasts further out are less certain`;
 }
 
 function fmtHour(t) {
@@ -144,12 +178,76 @@ function fmtHour(t) {
   return (h % 12 || 12) + (h < 12 ? "am" : "pm");
 }
 
+function render() {
+  const regions = DATA.regions;
+  if (!state.region) state.region = Object.keys(regions)[0];
+  const region = regions[state.region];
+  const days = region.days;
+  if (state.day >= days.length) state.day = 0;
+  const day = days[state.day];
+
+  const dateStr = new Date(day.date + "T12:00:00")
+    .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  document.getElementById("eyebrow").textContent =
+    `${dateStr} · ${region.name}`.toUpperCase().split("").join(" ");
+
+  const age = Math.round((Date.now() - new Date(DATA.generated_at)) / 60000);
+  const ageStr = age < 60 ? age + "m" : Math.round(age / 60) + "h";
+  const entries = state.part === "overall" ? day.overall : day.by_daypart[state.part];
+  document.getElementById("stat").innerHTML =
+    `<span>Spots / Updated</span><b>${(entries || []).length} / ${ageStr}</b>`;
+
+  document.getElementById("regions").replaceChildren(
+    ...Object.entries(regions).map(([k, v]) =>
+      chip(v.name, k === state.region, () => { state.region = k; state.day = 0; render(); })));
+  document.getElementById("days").replaceChildren(
+    ...days.map((d, i) => chip(dayLabel(d.date, i), i === state.day, () => { state.day = i; render(); })));
+  const parts = ["overall", ...Object.keys(DATA.dayparts)];
+  document.getElementById("parts").replaceChildren(
+    ...parts.map((p) => chip(PART_LABELS[p] || p, p === state.part, () => { state.part = p; render(); })));
+
+  document.getElementById("legend").innerHTML = [
+    [svgGlyph("ddiamond", "var(--fire)") + svgGlyph("ddiamond", "var(--fire)"), "Firing 90+"],
+    [svgGlyph("diamond", "var(--ink)"), `Go ${DATA.threshold}+`],
+    [svgGlyph("square", "var(--blue)"), "Fun 60+"],
+    [svgGlyph("circle", "var(--green)"), "Mellow 40+"],
+    [svgGlyph("hollow", "var(--muted)"), "Skip"],
+  ].map(([g, l]) => `<span class="li">${g}${l}</span>`).join("");
+
+  const list = document.getElementById("list");
+  if (!entries || !entries.length) {
+    list.innerHTML = '<div class="empty">No scoreable surf in this window</div>';
+    return;
+  }
+  list.replaceChildren(...entries.map((e, i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    const tide = e.tide ? e.tide[0].toUpperCase() + e.tide.slice(1) : "—";
+    row.innerHTML = `
+      <span class="rank">${String(i + 1).padStart(2, "0")}</span>
+      <span class="who">
+        <div class="name"></div>
+        <div class="sub"></div>
+      </span>
+      <span class="data">
+        <span class="cell"><span class="lbl">Swell</span><span class="val">${e.height_ft}ft @ ${e.period_s}s ${e.direction}</span></span>
+        <span class="cell"><span class="lbl">Wind</span><span class="val">${e.wind}</span></span>
+        <span class="cell"><span class="lbl">Tide</span><span class="val">${tide}</span></span>
+      </span>
+      <span class="q">${qualityHTML(e.score)}</span>`;
+    row.querySelector(".name").textContent = e.name;
+    row.querySelector(".sub").textContent =
+      `${e.break_type} · best ${fmtHour(e.best_time)}`;
+    return row;
+  }));
+}
+
 fetch("rankings.json?t=" + Math.floor(Date.now() / 300000))
   .then((r) => r.json())
   .then((d) => { DATA = d; render(); })
   .catch(() => {
     document.getElementById("list").innerHTML =
-      '<div class="empty">Couldn\'t load rankings — try again shortly.</div>';
+      '<div class="empty">Couldn\'t load rankings — try again shortly</div>';
   });
 </script>
 </body>
