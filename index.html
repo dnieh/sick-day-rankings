@@ -17,6 +17,7 @@
     --fire: #d43d17;
     --blue: #1d5bbf;
     --green: #17803d;
+    --amber: #8f6400;
   }
   * { box-sizing: border-box; }
   body {
@@ -53,12 +54,14 @@
     display: flex; gap: 1.2rem; flex-wrap: wrap;
   }
   .tideline .t-lbl { color: var(--muted); }
-  .legend {
-    display: flex; gap: 1.1rem; flex-wrap: wrap; align-items: center;
-    margin: 0.7rem 0 0;
-    font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+
+  .tip { cursor: help; border-bottom: 1px dotted var(--muted); position: relative; }
+  .tip:hover::after, .tip:focus::after {
+    content: attr(data-tip); position: absolute; right: 0; top: 1.5rem; z-index: 10;
+    background: var(--ink); color: var(--paper); padding: 0.55rem 0.75rem;
+    font-size: 0.66rem; letter-spacing: 0.1em; line-height: 1.9;
+    white-space: pre; text-align: left; border-radius: 4px; text-transform: none;
   }
-  .legend .li { display: inline-flex; align-items: center; gap: 0.35rem; }
 
   .cols {
     display: flex; justify-content: space-between; font-size: 0.68rem;
@@ -85,9 +88,8 @@
   .cell .lbl { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
   .cell .val { font-size: 0.95rem; white-space: nowrap; }
   .skill { width: 2.4rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 2px; }
-  .q { width: 3.6rem; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .q { width: 3rem; flex-shrink: 0; display: flex; justify-content: flex-end; }
   .score { font-size: 1.15rem; font-weight: 700; line-height: 1; }
-  .tier { font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; }
 
   footer { margin-top: 1.6rem; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--muted); line-height: 1.8; }
   footer a { color: var(--ink); }
@@ -117,9 +119,9 @@
   </div>
 
   <div class="tideline" id="tideline"></div>
-  <div class="legend" id="legend-skill"></div>
-  <div class="legend" id="legend"></div>
-  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind · Skill · Quality</span></div>
+  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind ·
+    <span class="tip" id="tip-skill" tabindex="0">Skill</span> ·
+    <span class="tip" id="tip-quality" tabindex="0">Quality</span></span></div>
   <div id="list"><div class="empty">Loading…</div></div>
 
   <footer>
@@ -133,12 +135,12 @@ const PART_LABELS = {
   overall: "Best of day", dawn: "Dawn 5–9", late_am: "Late AM 9–12",
   early_pm: "Early PM 12–3", late_pm: "Late PM 3–8",
 };
-// Quality: tier word + color, from score vs published threshold
+// Quality: score color by tier (green = go, like a green light)
 const TIERS = [
   { name: "Firing", color: "var(--fire)" },   // 90+
-  { name: "Go", color: "var(--ink)" },        // threshold+
+  { name: "Go", color: "var(--green)" },      // threshold+
   { name: "Fun", color: "var(--blue)" },      // 60+
-  { name: "Marginal", color: "var(--green)" },// 40+
+  { name: "Marginal", color: "var(--amber)" },// 40+
   { name: "Skip", color: "var(--muted)" },
 ];
 // Skill: ski-style rating of the BREAK itself
@@ -170,8 +172,7 @@ function tierFor(score) {
 
 function qualityHTML(score) {
   const tier = tierFor(score);
-  return `<span class="score" style="color:${tier.color}">${score}</span>` +
-         `<span class="tier" style="color:${tier.color}">${tier.name}</span>`;
+  return `<span class="score" style="color:${tier.color}" title="${tier.name}">${score}</span>`;
 }
 
 function skillHTML(difficulty) {
@@ -237,20 +238,10 @@ function render() {
     tideEl.style.display = "none";
   }
 
-  document.getElementById("legend-skill").innerHTML =
-    '<span class="li">Skill</span>' +
-    Object.values(SKILL).map((s) => {
-      const g = svgGlyph(s.glyph, s.color);
-      return `<span class="li">${s.glyph === "ddiamond" ? g + g : g}${s.label}</span>`;
-    }).join("");
-  document.getElementById("legend").innerHTML =
-    '<span class="li">Quality</span>' + [
-      [`Firing 90+`, "var(--fire)"],
-      [`Go ${DATA.threshold}+`, "var(--ink)"],
-      ["Fun 60+", "var(--blue)"],
-      ["Marginal 40+", "var(--green)"],
-      ["Skip", "var(--muted)"],
-    ].map(([l, c]) => `<span class="li" style="color:${c}">${l}</span>`).join("");
+  document.getElementById("tip-skill").setAttribute("data-tip",
+    "Skill rating of the break\n● All levels\n■ Intermediate\n◆ Advanced\n◆◆ Experts only");
+  document.getElementById("tip-quality").setAttribute("data-tip",
+    `Conditions score, 0–100\n90+  Firing\n${DATA.threshold}+  Go — drop your plans\n60+  Fun\n40+  Marginal\n<40  Skip`);
 
   const list = document.getElementById("list");
   if (!entries || !entries.length) {
@@ -274,7 +265,7 @@ function render() {
       <span class="q">${qualityHTML(e.score)}</span>`;
     row.querySelector(".name").textContent = e.name;
     row.querySelector(".sub").textContent =
-      `${e.break_type} · best ${fmtHour(e.best_time)}`;
+      `${e.break_type}${e.swell_window ? " · takes " + e.swell_window : ""} · best ${fmtHour(e.best_time)}`;
     return row;
   }));
 }
