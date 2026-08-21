@@ -47,9 +47,15 @@
   }
   .chip.on { color: var(--ink); border-bottom-color: var(--fire); }
 
+  .tideline {
+    margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--hairline);
+    font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
+    display: flex; gap: 1.2rem; flex-wrap: wrap;
+  }
+  .tideline .t-lbl { color: var(--muted); }
   .legend {
     display: flex; gap: 1.1rem; flex-wrap: wrap; align-items: center;
-    margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--hairline);
+    margin: 0.7rem 0 0;
     font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
   }
   .legend .li { display: inline-flex; align-items: center; gap: 0.35rem; }
@@ -108,8 +114,9 @@
     <div class="chips" id="parts"></div>
   </div>
 
+  <div class="tideline" id="tideline"></div>
   <div class="legend" id="legend"></div>
-  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind · Tide · Quality</span></div>
+  <div class="cols"><span>Rank · Spot</span><span>Swell · Wind · Quality</span></div>
   <div id="list"><div class="empty">Loading…</div></div>
 
   <footer>
@@ -206,6 +213,15 @@ function render() {
   document.getElementById("parts").replaceChildren(
     ...parts.map((p) => chip(PART_LABELS[p] || p, p === state.part, () => { state.part = p; render(); })));
 
+  const tideEl = document.getElementById("tideline");
+  if (day.tides && day.tides.length) {
+    tideEl.style.display = "flex";
+    tideEl.innerHTML = '<span class="t-lbl">Tide</span>' + day.tides.map((t) =>
+      `<span>${t.type} ${fmtHour(t.time)} · ${t.height_ft}ft</span>`).join("");
+  } else {
+    tideEl.style.display = "none";
+  }
+
   document.getElementById("legend").innerHTML = [
     [svgGlyph("ddiamond", "var(--fire)") + svgGlyph("ddiamond", "var(--fire)"), "Firing 90+"],
     [svgGlyph("diamond", "var(--ink)"), `Go ${DATA.threshold}+`],
@@ -222,7 +238,6 @@ function render() {
   list.replaceChildren(...entries.map((e, i) => {
     const row = document.createElement("div");
     row.className = "row";
-    const tide = e.tide ? e.tide[0].toUpperCase() + e.tide.slice(1) : "—";
     row.innerHTML = `
       <span class="rank">${String(i + 1).padStart(2, "0")}</span>
       <span class="who">
@@ -232,7 +247,6 @@ function render() {
       <span class="data">
         <span class="cell"><span class="lbl">Swell</span><span class="val">${e.height_ft}ft @ ${e.period_s}s ${e.direction}</span></span>
         <span class="cell"><span class="lbl">Wind</span><span class="val">${e.wind}</span></span>
-        <span class="cell"><span class="lbl">Tide</span><span class="val">${tide}</span></span>
       </span>
       <span class="q">${qualityHTML(e.score)}</span>`;
     row.querySelector(".name").textContent = e.name;
