@@ -264,7 +264,6 @@ function renderTide(day, region) {
 
   const ink = "#121210", muted = "#6d6b62", fire = "#d43d17", hair = "#c9c7bb";
   let parts = [];
-  parts.push(`<line x1="${padX}" y1="${H - padBot}" x2="${W - padX}" y2="${H - padBot}" stroke="${hair}" stroke-width="1"></line>`);
   if (nowPt) {
     const solid = pts.slice(0, si + 1).concat([nowPt]);
     const dashed = [nowPt].concat(pts.slice(si + 1));
