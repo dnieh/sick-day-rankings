@@ -153,7 +153,9 @@ const SKILL = {
   double_black: { glyph: "ddiamond", color: "var(--ink)", label: "Experts" },
 };
 let DATA = null;
-let state = { region: null, day: 0, part: "overall" };
+// part starts unset: it defaults to the window you're currently in, until
+// you pick one yourself (partPinned), after which your choice sticks.
+let state = { region: null, day: 0, part: "overall", partPinned: false };
 
 function svgGlyph(kind, color) {
   const s = (inner) =>
@@ -291,6 +293,20 @@ function renderTide(day, region) {
   svg.innerHTML = parts.join("");
 }
 
+// The daypart containing the region's current local hour. Outside surfable
+// hours (night) that's the first window — dawn, the next session. Falls back
+// to "Best of day" if the live window has nothing scoreable.
+function autoPart(region, day) {
+  const h = nowHourIn(region.timezone);
+  const names = Object.keys(DATA.dayparts);
+  let pick = names.find((n) => {
+    const [lo, hi] = DATA.dayparts[n];
+    return h >= lo && h < hi;
+  }) || names[0];
+  const list = day.by_daypart[pick];
+  return list && list.length ? pick : "overall";
+}
+
 function render() {
   const regions = DATA.regions;
   if (!state.region) state.region = Object.keys(regions)[0];
@@ -298,6 +314,7 @@ function render() {
   const days = region.days;
   if (state.day >= days.length) state.day = 0;
   const day = days[state.day];
+  if (!state.partPinned) state.part = autoPart(region, day);
 
   const dateStr = new Date(day.date + "T12:00:00")
     .toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
@@ -317,7 +334,8 @@ function render() {
     ...days.map((d, i) => chip(dayLabel(d.date, i), i === state.day, () => { state.day = i; render(); })));
   const parts = ["overall", ...Object.keys(DATA.dayparts)];
   document.getElementById("parts").replaceChildren(
-    ...parts.map((p) => chip(PART_LABELS[p] || p, p === state.part, () => { state.part = p; render(); })));
+    ...parts.map((p) => chip(PART_LABELS[p] || p, p === state.part,
+      () => { state.part = p; state.partPinned = true; render(); })));
 
   renderTide(day, region);
 
