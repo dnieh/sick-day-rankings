@@ -54,8 +54,7 @@
     display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: space-between;
   }
   .tideline .t-lbl { color: var(--muted); }
-  .tideline .t-note { color: var(--muted); font-size: 0.6rem; letter-spacing: 0.18em; }
-  #tidechart { display: block; width: 100%; height: auto; margin-top: 0.3rem; }
+  #tidechart { display: block; width: 100%; height: auto; margin-top: 0.2rem; }
 
   .tip { cursor: help; border-bottom: 1px dotted var(--muted); position: relative; }
   .tip:hover::after, .tip:focus::after {
@@ -121,7 +120,7 @@
   </div>
 
   <div class="tideline" id="tideline"></div>
-  <svg id="tidechart" viewBox="0 0 720 104" role="img" aria-label="Tide chart for the selected day"></svg>
+  <svg id="tidechart" viewBox="0 0 720 62" role="img" aria-label="Tide chart for the selected day"></svg>
   <div class="cols"><span>Rank · Spot</span><span>Swell · Wind ·
     <span class="tip" id="tip-skill" tabindex="0">Skill</span> ·
     <span class="tip" id="tip-quality" tabindex="0">Quality</span></span></div>
@@ -243,10 +242,10 @@ function renderTide(day, region) {
     return;
   }
   strip.style.display = "flex";
-  strip.innerHTML = '<span class="t-lbl">Tide</span><span class="t-note">solid = so far · dashed = rest of day</span>';
+  strip.innerHTML = '<span class="t-lbl">Tide</span>';
   svg.style.display = "block";
 
-  const W = 720, H = 104, padX = 10, padTop = 22, padBot = 18;
+  const W = 720, H = 62, padX = 10, padTop = 15, padBot = 13;
   const hs = curve.map((p) => p.h);
   const lo = Math.min(...hs), hi = Math.max(...hs), span = (hi - lo) || 1;
   const X = (hour) => padX + (hour / 23) * (W - 2 * padX);
@@ -271,8 +270,8 @@ function renderTide(day, region) {
     const dashed = [nowPt].concat(pts.slice(si + 1));
     parts.push(`<path d="${smoothPath(solid)}" fill="none" stroke="${ink}" stroke-width="2"></path>`);
     parts.push(`<path d="${smoothPath(dashed)}" fill="none" stroke="${ink}" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"></path>`);
-    parts.push(`<line x1="${nowPt.x.toFixed(1)}" y1="${padTop - 6}" x2="${nowPt.x.toFixed(1)}" y2="${H - padBot}" stroke="${hair}" stroke-width="1"></line>`);
-    parts.push(`<circle cx="${nowPt.x.toFixed(1)}" cy="${nowPt.y.toFixed(1)}" r="3.5" fill="${fire}"></circle>`);
+    parts.push(`<line x1="${nowPt.x.toFixed(1)}" y1="${padTop - 4}" x2="${nowPt.x.toFixed(1)}" y2="${H - padBot}" stroke="${hair}" stroke-width="1"></line>`);
+    parts.push(`<circle cx="${nowPt.x.toFixed(1)}" cy="${nowPt.y.toFixed(1)}" r="3" fill="${fire}"></circle>`);
   } else {
     parts.push(`<path d="${smoothPath(pts)}" fill="none" stroke="${ink}" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"></path>`);
   }
@@ -286,8 +285,8 @@ function renderTide(day, region) {
     if (lx < 60) anchor = "start";
     if (lx > W - 60) anchor = "end";
     parts.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${ink}"></circle>`);
-    parts.push(`<text x="${lx.toFixed(1)}" y="${(up ? y - 9 : y + 15).toFixed(1)}" text-anchor="${anchor}" ` +
-      `font-family="Space Mono, monospace" font-size="10" letter-spacing="1" fill="${muted}">` +
+    parts.push(`<text x="${lx.toFixed(1)}" y="${(up ? y - 7 : y + 13).toFixed(1)}" text-anchor="${anchor}" ` +
+      `font-family="Space Mono, monospace" font-size="9" letter-spacing="0.8" fill="${muted}">` +
       `${up ? "H" : "L"} ${fmtHour(t.time).toUpperCase()} · ${t.height_ft}FT</text>`);
   }
   svg.innerHTML = parts.join("");
